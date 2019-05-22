@@ -75,8 +75,11 @@ head(variab[order(variab, decreasing=TRUE)])
 
 ## AssayData
 
-```{r}
+```{r include=FALSE}
 require(Biobase)
+```
+
+```{r}
 expressions <- as.matrix(expressions)
 set <- ExpressionSet(expressions)
 show(set)
@@ -149,9 +152,15 @@ all(colnames(exprs(hm6hSet))==rownames(pData(hm6hSet)))
 
 The GEO set that has been studied along the report corresponds to accession code in NCBI GEO GSE66597.
 
-```{r}
+```{r include=FALSE}
 require(GEOquery)
+```
+
+```{r}
 gse <- getGEO("GSE66597")
+```
+
+```{r}
 class(gse)
 names(gse)
 setFromGeo <- gse[[1]]
