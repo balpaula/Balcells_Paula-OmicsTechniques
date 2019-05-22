@@ -10,13 +10,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # Introduction
+The goal of this practical is to learn the basics of Bioconductor and Rmarkdown. Fo rhis purpose, we are going to work on a study from the Gene Expression Omnibus Database.
 
-What this exercise is about
+The study selected is "Insights into responses of human astrocytes to H5N1 infection by transcriptional analysis" with GEO accession code GSE66597.We have used the expression matrix, the experiment description and the experimental groups from this study.
+
+The ExpressionSet object is created using two different methodologies:
+
+* Creating and assembling the different components
+* Using GEOquery package
 
 # Summary
-
-The study "Insights into responses of human astrocytes to H5N1 infection by transcriptional analysis""
-was done using Homo Sapiens organisms and experiment type	Expression profiling by array.
+The study "Insights into responses of human astrocytes to H5N1 infection by transcriptional analysis" was done using Homo Sapiens organisms and experiment type	Expression profiling by array.
 
 The following description was provided:	
 *Increasing evidence demonstrates influenza virus can not only affect the respiratory system, but also infect CNS and lead to CNS disorder and encephalopathy and encephalitis. Astrocytes are the most abundant cells in the CNS, which are capable of producing cytokines and neurotrophic factors and are essential for brain homeostasis and neuronal function. Previous studies suggested that influenza virus can infect astrocytes and induce proinflammatory cytokines response as well as apoptosis. Nevertheless, very few mechanistic data are available regarding host responses to H5N1 infection in astrocytes. In this study, a functional genomics approach was utilized to investigate comprehensive host responses to H5N1 infection in a human astrocyte cell line, U251 cells.*
@@ -26,6 +30,9 @@ U251 cells were infected by H5N1 at MOI 1 or control . At time points 6, 12, and
  	
 ## Platform
 GPL6480:	Agilent-014850 Whole Human Genome Microarray 4x44K G4112F (Probe Name version)
+
+## Status
+Public on Jan 04, 2016
  	
 ## Contributor(s)	
 Lin X, Wang R, Sun X, Zhang J, Jin M
@@ -46,10 +53,16 @@ info=list(myName="Paula Balcells", myLab="BDBI Omics Techniques",
 myContact="paulabalcells@gmail.com.com", myTitle="Practical Exercise on ExpressionSets")
 ```
 
+Expression values: matrix of 41091 rows and 18 columns.
+Covariates: sampleName, Group, Replicate, Color.
+Genes: identifiers of the genes in the column 0 of the expression values matrix.
+
 ```{r}
 dim(expressions)
 summary(expressions)
 ```
+
+Plotting the data:
 
 ```{r}
 boxplot(expressions, col=targets$Color)
@@ -72,6 +85,15 @@ head(variab[order(variab, decreasing=TRUE)])
 ```
 
 # ExpressionSet
+
+The ExpressionSet class contains the following slots:
+
+* assayData: Matrix of expression measures, genes x samples
+* phenoData: Sample level covariates, instance of class annotatedDataFrame
+* Annotation: Name of annotation data source (annotation package)
+* featureData: Name of features = data identifiers
+* experimentData: MIAME information
+* notes: Any notes
 
 ## AssayData
 
@@ -156,7 +178,7 @@ The GEO set that has been studied along the report corresponds to accession code
 require(GEOquery)
 ```
 
-```{r}
+```{r echo = T, results = 'hide'}
 gse <- getGEO("GSE66597")
 ```
 
@@ -164,5 +186,8 @@ gse <- getGEO("GSE66597")
 class(gse)
 names(gse)
 setFromGeo <- gse[[1]]
+class(setFromGeo)
 ```
 
+# Github repository
+https://github.com/balpaula/Balcells_Paula-OmicsTechniques
