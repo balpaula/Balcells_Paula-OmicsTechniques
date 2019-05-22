@@ -24,6 +24,9 @@ The following description was provided:
 ## Experimental design	
 U251 cells were infected by H5N1 at MOI 1 or control . At time points 6, 12, and 24h, total RNA were extracted for microarray experiment. Three replicates were performed at each time point of infection and control infection.
  	
+## Platform
+GPL6480:	Agilent-014850 Whole Human Genome Microarray 4x44K G4112F (Probe Name version)
+ 	
 ## Contributor(s)	
 Lin X, Wang R, Sun X, Zhang J, Jin M
 
@@ -35,10 +38,12 @@ Lin X, Wang R, Zhang J, Sun X et al. Insights into Human Astrocyte Response to H
 ```{r readTargets}
 targets <- read.csv("targets.txt", sep="")
 expressions <- read.delim("GSE66597_expression.txt", row.names = 1)
+genes <- t(expressions)[0,]
 ```
 
 ```{r}
-show(targets)
+info=list(myName="Paula Balcells", myLab="BDBI Omics Techniques",
+myContact="paulabalcells@gmail.com.com", myTitle="Practical Exercise on ExpressionSets")
 ```
 
 ```{r}
@@ -49,3 +54,106 @@ summary(expressions)
 ```{r}
 boxplot(expressions, col=targets$Color)
 ```
+
+Principal components analysis:
+
+```{r}
+pcs <- prcomp(expressions)
+names(pcs)
+barplot(pcs$sdev)
+```
+
+The top variable genes are:
+
+```{r}
+variab <- apply(expressions, 1, sd)
+orderedGenes <- genes[order(variab, decreasing=TRUE)]
+head(variab[order(variab, decreasing=TRUE)])
+```
+
+# ExpressionSet
+
+## AssayData
+
+```{r}
+require(Biobase)
+expressions <- as.matrix(expressions)
+set <- ExpressionSet(expressions)
+show(set)
+```
+
+## Information about covariates
+```{r}
+columnDesc <-  data.frame(labelDescription= c("Sample Name", "Group", "Replicate", "Color"))
+annot <- new("AnnotatedDataFrame", data=targets, varMetadata= columnDesc)
+show(annot)
+```
+
+Add the annotated data frame to the expression set:
+
+```{r}
+rownames(pData(annot))<-pData(annot)$sampleName
+set <- ExpressionSet(assayData=expressions, phenoData=annot)
+show(set)
+```
+
+## Information about features
+```{r}
+set <- ExpressionSet(assayData=expressions,
+phenoData=annot,
+featureNames =genes)
+show(set)
+```
+
+## Information about the experiment
+
+```{r}
+descExp <- new("MIAME", name= info[["myName"]],
+lab= info[["myLab"]],
+contact= info[["myContact"]] ,
+title=info[["myTitle"]])
+
+set <- ExpressionSet(assayData=expressions, phenoData=annot, fetureNames=genes, experimentData=descExp)
+
+show(set)
+```
+
+## Objects of class ExpressionSet
+
+```{r}
+dim(exprs(set))
+class(phenoData(set))
+class(pData(phenoData(set)))
+head(pData(phenoData(set)))
+head(pData(set))
+```
+
+### Subsetting ExpressionSet
+
+```{r}
+con6hSet <- set[,pData(set)$Group=="con6h"]
+con12hSet <- set[,pData(set)$Group=="con12h"]
+con24hSet <- set[,pData(set)$Group=="con24h"]
+hm6hSet <- set[,pData(set)$Group=="hm6h"]
+hm12hSet <- set[,pData(set)$Group=="hm12h"]
+hm24hSet <- set[,pData(set)$Group=="hm24h"]
+
+dim(exprs(con6hSet))
+head(pData(con6hSet))
+
+all(colnames(exprs(con6hSet))==rownames(pData(con6hSet)))
+all(colnames(exprs(hm6hSet))==rownames(pData(hm6hSet)))
+```
+
+# Data grom GEO
+
+The GEO set that has been studied along the report corresponds to accession code in NCBI GEO GSE66597.
+
+```{r}
+require(GEOquery)
+gse <- getGEO("GSE66597")
+class(gse)
+names(gse)
+setFromGeo <- gse[[1]]
+```
+
