@@ -101,6 +101,8 @@ The ExpressionSet class contains the following slots:
 require(Biobase)
 ```
 
+The assay data slot contains a matrix of with the expression values. There are as many rows as genes and as many columns as samples.
+
 ```{r}
 expressions <- as.matrix(expressions)
 set <- ExpressionSet(expressions)
@@ -108,13 +110,16 @@ show(set)
 ```
 
 ## Information about covariates
+
+The covariates in the targets data frame need to be included in the slot featureData as an AnnotatedDataFrame.
+
 ```{r}
 columnDesc <-  data.frame(labelDescription= c("Sample Name", "Group", "Replicate", "Color"))
 annot <- new("AnnotatedDataFrame", data=targets, varMetadata= columnDesc)
 show(annot)
 ```
 
-Add the annotated data frame to the expression set:
+Add the annotated data frame to the expression set.
 
 ```{r}
 rownames(pData(annot))<-pData(annot)$sampleName
@@ -123,6 +128,9 @@ show(set)
 ```
 
 ## Information about features
+
+The information about the genes can be stored in the featureData slot, also as an AnnotatedDataFrame.
+
 ```{r}
 set <- ExpressionSet(assayData=expressions,
 phenoData=annot,
@@ -131,6 +139,8 @@ show(set)
 ```
 
 ## Information about the experiment
+
+The information about the experiment can be stored in the experimentData slot, as MIAME information.
 
 ```{r}
 descExp <- new("MIAME", name= info[["myName"]],
@@ -145,6 +155,8 @@ show(set)
 
 ## Objects of class ExpressionSet
 
+Data in an ExpressionSet can be managed for different purposes, with consistency within the class ensured. It is possible to acces slot values as well as subsetting the ExpressionSet, for example.
+
 ```{r}
 dim(exprs(set))
 class(phenoData(set))
@@ -154,6 +166,8 @@ head(pData(set))
 ```
 
 ### Subsetting ExpressionSet
+
+We are going to subset the ExpressionSet into the different groups of the experiment accounting for the targets covariates.
 
 ```{r}
 con6hSet <- set[,pData(set)$Group=="con6h"]
@@ -178,9 +192,13 @@ The GEO set that has been studied along the report corresponds to accession code
 require(GEOquery)
 ```
 
+We can use the package GEOquery to retrieve the data.
+
 ```{r echo = T, results = 'hide'}
 gse <- getGEO("GSE66597")
 ```
+
+We can access the ExpressionSet object from the "gse" list.
 
 ```{r}
 class(gse)

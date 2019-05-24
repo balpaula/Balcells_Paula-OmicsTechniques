@@ -309,6 +309,7 @@ head(variab[order(variab, decreasing=TRUE)])</code></pre>
 </ul>
 <div id="assaydata" class="section level2">
 <h2>AssayData</h2>
+<p>The assay data slot contains a matrix of with the expression values. There are as many rows as genes and as many columns as samples.</p>
 <pre class="r"><code>expressions &lt;- as.matrix(expressions)
 set &lt;- ExpressionSet(expressions)
 show(set)</code></pre>
@@ -323,6 +324,7 @@ show(set)</code></pre>
 </div>
 <div id="information-about-covariates" class="section level2">
 <h2>Information about covariates</h2>
+<p>The covariates in the targets data frame need to be included in the slot featureData as an AnnotatedDataFrame.</p>
 <pre class="r"><code>columnDesc &lt;-  data.frame(labelDescription= c(&quot;Sample Name&quot;, &quot;Group&quot;, &quot;Replicate&quot;, &quot;Color&quot;))
 annot &lt;- new(&quot;AnnotatedDataFrame&quot;, data=targets, varMetadata= columnDesc)
 show(annot)</code></pre>
@@ -330,7 +332,7 @@ show(annot)</code></pre>
 ##   rowNames: 1 2 ... 18 (18 total)
 ##   varLabels: sampleName Group Replicate Color
 ##   varMetadata: labelDescription</code></pre>
-<p>Add the annotated data frame to the expression set:</p>
+<p>Add the annotated data frame to the expression set.</p>
 <pre class="r"><code>rownames(pData(annot))&lt;-pData(annot)$sampleName
 set &lt;- ExpressionSet(assayData=expressions, phenoData=annot)
 show(set)</code></pre>
@@ -348,6 +350,7 @@ show(set)</code></pre>
 </div>
 <div id="information-about-features" class="section level2">
 <h2>Information about features</h2>
+<p>The information about the genes can be stored in the featureData slot, also as an AnnotatedDataFrame.</p>
 <pre class="r"><code>set &lt;- ExpressionSet(assayData=expressions,
 phenoData=annot,
 featureNames =genes)
@@ -366,6 +369,7 @@ show(set)</code></pre>
 </div>
 <div id="information-about-the-experiment" class="section level2">
 <h2>Information about the experiment</h2>
+<p>The information about the experiment can be stored in the experimentData slot, as MIAME information.</p>
 <pre class="r"><code>descExp &lt;- new(&quot;MIAME&quot;, name= info[[&quot;myName&quot;]],
 lab= info[[&quot;myLab&quot;]],
 contact= info[[&quot;myContact&quot;]] ,
@@ -388,6 +392,7 @@ show(set)</code></pre>
 </div>
 <div id="objects-of-class-expressionset" class="section level2">
 <h2>Objects of class ExpressionSet</h2>
+<p>Data in an ExpressionSet can be managed for different purposes, with consistency within the class ensured. It is possible to acces slot values as well as subsetting the ExpressionSet, for example.</p>
 <pre class="r"><code>dim(exprs(set))</code></pre>
 <pre><code>## [1] 41091    18</code></pre>
 <pre class="r"><code>class(phenoData(set))</code></pre>
@@ -414,6 +419,7 @@ show(set)</code></pre>
 ## GSM1626000 GSM1626000 con12h      rep3     3</code></pre>
 <div id="subsetting-expressionset" class="section level3">
 <h3>Subsetting ExpressionSet</h3>
+<p>We are going to subset the ExpressionSet into the different groups of the experiment accounting for the targets covariates.</p>
 <pre class="r"><code>con6hSet &lt;- set[,pData(set)$Group==&quot;con6h&quot;]
 con12hSet &lt;- set[,pData(set)$Group==&quot;con12h&quot;]
 con24hSet &lt;- set[,pData(set)$Group==&quot;con24h&quot;]
@@ -438,6 +444,7 @@ dim(exprs(con6hSet))</code></pre>
 <div id="data-grom-geo" class="section level1">
 <h1>Data grom GEO</h1>
 <p>The GEO set that has been studied along the report corresponds to accession code in NCBI GEO GSE66597.</p>
+<p>We can use the package GEOquery to retrieve the data.</p>
 <pre class="r"><code>gse &lt;- getGEO(&quot;GSE66597&quot;)</code></pre>
 <pre><code>## Found 1 file(s)</code></pre>
 <pre><code>## GSE66597_series_matrix.txt.gz</code></pre>
@@ -464,7 +471,7 @@ dim(exprs(con6hSet))</code></pre>
 ##   GSM1626012 = col_double()
 ## )</code></pre>
 <pre><code>## File stored at:</code></pre>
-<pre><code>## /tmp/RtmpjbcAlr/GPL6480.soft</code></pre>
+<pre><code>## /tmp/RtmpgXzmgS/GPL6480.soft</code></pre>
 <pre><code>## Warning: 94 parsing failures.
 ##   row          col           expected actual         file
 ## 41001 CONTROL_TYPE 1/0/T/F/TRUE/FALSE    pos literal data
@@ -474,11 +481,16 @@ dim(exprs(con6hSet))</code></pre>
 ## 41005 CONTROL_TYPE 1/0/T/F/TRUE/FALSE    pos literal data
 ## ..... ............ .................. ...... ............
 ## See problems(...) for more details.</code></pre>
+<p>We can access the ExpressionSet object from the “gse” list.</p>
 <pre class="r"><code>class(gse)</code></pre>
 <pre><code>## [1] &quot;list&quot;</code></pre>
 <pre class="r"><code>names(gse)</code></pre>
 <pre><code>## [1] &quot;GSE66597_series_matrix.txt.gz&quot;</code></pre>
-<pre class="r"><code>setFromGeo &lt;- gse[[1]]</code></pre>
+<pre class="r"><code>setFromGeo &lt;- gse[[1]]
+class(setFromGeo)</code></pre>
+<pre><code>## [1] &quot;ExpressionSet&quot;
+## attr(,&quot;package&quot;)
+## [1] &quot;Biobase&quot;</code></pre>
 </div>
 <div id="github-repository" class="section level1">
 <h1>Github repository</h1>
