@@ -48,28 +48,38 @@ install.packages("gdtools")
 
 install.packages("gridSVG")
 
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("affyPLM")
 
 #---------------------------------------------------------------------------------------------
 ###LOAD DATA: TARGETS AND CEL FILES. 
 #---------------------------------------------------------------------------------------------
 
+require(GEOquery)
+gse <- getGEO("GSE66597")
+set <- gse[[1]]
+
+rawData <- set
+
 #TARGETS
-targets <-read.csv(file=file.path(dataDir,"targets2.txt"), header = TRUE, sep="") 
+targets <-read.csv(file=file.path(dataDir,"targets.txt"), header = TRUE, sep="") 
 targets
 
 #Read the targets again but as annotated data frame
 require(Biobase)
-targets_annotated <- read.AnnotatedDataFrame(file.path(dataDir, "targets2.txt"), header = TRUE, row.names = 1, sep="")
+targets_annotated <- read.AnnotatedDataFrame(file.path(dataDir, "targets.txt"), header = TRUE, row.names = 1, sep="")
 
 #CELFILES
 require(oligo)
-CELfiles <- list.celfiles(file.path(dataDir))
-rawData <- read.celfiles(file.path(dataDir,CELfiles))
+#CELfiles <- list.celfiles(file.path(dataDir))
+#rawData2 <- read.celfiles(file.path(dataDir,CELfiles))
 
-colnames(rawData) <- rownames(pData(rawData)) <- targets_annotated@data$ShortName
+#colnames(rawData) <- rownames(pData(rawData)) <- targets_annotated@data$ShortName
 
 #DEFINE SOME VARIABLES FOR PLOTS
-sampleNames <- as.character(targets$ShortName)
+sampleNames <- as.character(targets$sampleName)
 sampleColor <- as.character(targets$Color)
 
 
@@ -122,7 +132,9 @@ dev.off()
 #---------------------------------------------------------------------------------------------
 ###DATA NORMALIZATION
 #---------------------------------------------------------------------------------------------
-eset<-rma(rawData)
+
+require("affyPLM")
+eset <- normalize.ExpressionSet.invariantset(set)
 
 write.exprs(eset, file.path(resultsDir, "NormData.txt"))
 
