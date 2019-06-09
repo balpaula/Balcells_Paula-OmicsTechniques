@@ -1,0 +1,103 @@
+---
+title: "Exercices in linear models and experimental design"
+author: "Alex Sánchez"
+output:
+  html_document:
+    theme: united
+    toc: yes
+  pdf_document:
+    toc: no
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width = 12, fig.height = 8, cache = FALSE,
+                      echo = FALSE, warning = FALSE, message = FALSE)
+```
+# Introduction
+
+These exercises describe experimental situations that have been studied using some omics technology like microarrays.
+
+# Comparison between three types of breast cancer
+
+This case study is based on a paer published in  http://www.ncbi.nlm.nih.gov/pubmed/15897907 whose data are available in GEO as series GSE1561 series on the following link
+http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE1561
+
+The researchers investigated three types of breast
+cancer tumors: apocrine (APO), basal (BAS) and luminal (LUMI). The classification is based on the resistance of tumors to estrogen and androgen receptors.
+
+- Tumors classified as "APO" are negative for estrogen receptor (ER-) and positive for the androgen receptor (AR +).
+- Those classified as "LUMI" are ER + and AR + and
+- Those classified as "BAS" are ER- and AR.
+
+The assignment of each sample to an experimental group can be obtained from this link:
+http://www.ncbi.nlm.nih.gov/geo/gds/profileGraph.cgi?gds=1329
+
+Obviously this is an observational study but its analysis can be done using a linear model approach as well.
+
+1. Identify the experimental factors and their levels.
+2. Write down the design matrix associated with this study design.
+3. Build the contrast matrix needed to compare each tumor type with the oher two, that is:
+
+    1. "APO" vs “LUMI”
+    2. “APO" vs “BAS”
+    3. “LUMI" vas "BAS"
+    
+
+```{r readTargets}
+require (limma)
+targetsLocation<- "https://raw.githubusercontent.com/alexsanchezpla/Ejemplo_de_MDA_con_Bioconductor/master/data/targets.txt"
+targets<- read.delim(targetsLocation, row.names=1)
+```
+
+```{r readData}
+dataLocation<- "https://raw.githubusercontent.com/alexsanchezpla/Ejemplo_de_MDA_con_Bioconductor/master/results/Datos.Normalizados.Filtrados.csv2"
+dataMatrix <- read.csv2(dataLocation, row.names = 1)
+colnames(dataMatrix)==rownames(targets)
+```
+
+```{r designMatrix}
+design<-matrix(
+  c(1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,1,1,1,1,1),
+  nrow=15,byrow=F)
+design2 <-model.matrix(~ 0+targets$Group)
+colnames(design)<- colnames(design2)<-c("A", "B", "L")
+rownames(design) <- rownames(design2)<- targets$SampleIDs 
+print(design); print(design2)
+```
+
+```{r contrastsMatrix}
+cont.matrix <- makeContrasts (
+  AvsB = B-A,
+  AvsL = L-A,
+  BvsL = L-B,
+  levels=design)
+```
+
+```{r fitModel}
+require(limma)
+fit<-lmFit(dataMatrix, design)
+fit.main<-contrasts.fit(fit, cont.matrix)
+fit.main<-eBayes(fit.main)
+```
+
+```{r extractResults}
+topTab_AvsB <- topTable (fit.main, number=nrow(fit.main), coef="AvsB", adjust="fdr"); head(topTab_AvsB)
+topTab_AvsL <- topTable (fit.main, number=nrow(fit.main), coef="AvsL", adjust="fdr"); head(topTab_AvsL)
+topTab_BvsL  <- topTable (fit.main, number=nrow(fit.main) , coef="BvsL", adjust="fdr"); head(topTab_BvsL)
+```
+
+```{r showResults}
+volcanoplot(fit.main, coef="AvsB", highlight=10)
+volcanoplot(fit.main, coef="AvsL", highlight=10)
+volcanoplot(fit.main, coef="BvsL", highlight=10)
+```
+`
+
+
+
+
+
+
+

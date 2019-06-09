@@ -1,0 +1,64 @@
+---
+title: "Microarray data analysis"
+author: "Paula Balcells"
+date: "June 9, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+workingDir <-getwd()
+dataDir <- file.path(workingDir, "dades")
+```
+
+## Abstract
+Influenza virus can not only affect the respiratory system but also infect the central nervous system (CNS) by leading to CNS disorder and encephalopathy and encephalitis. Previous studies suggest that infected astrocytes can produce cytokines as well as induce apoptosis as a response. The microarray data from a study that aims to investigate comprehensive host responses to H5N1 infection in a human astrocyte cell line (U251 cells) has been analyzed.
+
+## Objectives
+The objective of the main study is to characterize the comprehensive host responses to H5N1 infection in the human astrocyte cell line U251.
+
+The goal for this microarray data analysis is to determine the genes involved in the response of human astrocytes to H5N1 infection by quantifying the expression levels of the genes of infected and non infected cells at different times.
+
+The specific objectives of thus analysis are:
+
+* Assessment of the quality of the raw dat
+* Assessment of the data of the normalized data
+* Identification of differentially expressed genes
+
+In order to achieve the main objective, to define the respone of U251 human astrocyte cells against influenza infection.
+
+## Material and methods
+The experiment performed is an expression profiling by array. The experimental design from which the data was obtained consisted on: *U251 cells were infected by H5N1 at MOI 1 or control . At time points 6, 12, and 24h, total RNA were extracted for microarray experiment. Three replicates were performed at each time point of infection and control infection.*
+
+The data to be analyzed and obtained from the experiment consists on RNA microarray data. 
+
+The expression set has been obtained using the GEOquery package, as no CEL files are provided for the original experiment.
+
+```{r eval=FALSE}
+require(GEOquery)
+gse <- getGEO("GSE66597")
+set <- gse[[1]]
+rawData <- set
+```
+
+A total of 18 samples were obtained for microarray experiment.
+
+The targets include 2 groups (infected, control), 3 time points for each group (6h, 12h, 24h) and 3 replicates for each group and time point. 
+
+```{r}
+targets <-read.csv(file=file.path(dataDir,"targets.txt"), header = TRUE, sep="") 
+```
+
+
+### Workflow
+
+### Procedures
+
+## Results
+
+## Discussion
+
+## Conclusions

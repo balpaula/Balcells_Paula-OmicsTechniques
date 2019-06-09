@@ -1,0 +1,18 @@
+---
+title: "Exercise Report"
+author: "Paula Balcells"
+date: "May 31, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Limitation: Small sample size
+
+Difference org and monogene:
+- org: I don't know /I don't want to know the technology that has to be used
+- mogene: when I know with which technology has been obtained
+
+org.Mm.eg.db: organism Mus musculus entrez gene database

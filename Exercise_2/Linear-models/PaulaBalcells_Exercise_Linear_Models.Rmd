@@ -1,0 +1,113 @@
+---
+title: "Exercise linear models"
+author: "Paula Balcells"
+date: "May 29, 2019"
+output: html_document
+---
+
+# Summary
+The study "Insights into responses of human astrocytes to H5N1 infection by transcriptional analysis" was done using Homo Sapiens organisms and experiment type	Expression profiling by array.
+
+The following description was provided:	
+*Increasing evidence demonstrates influenza virus can not only affect the respiratory system, but also infect CNS and lead to CNS disorder and encephalopathy and encephalitis. Astrocytes are the most abundant cells in the CNS, which are capable of producing cytokines and neurotrophic factors and are essential for brain homeostasis and neuronal function. Previous studies suggested that influenza virus can infect astrocytes and induce proinflammatory cytokines response as well as apoptosis. Nevertheless, very few mechanistic data are available regarding host responses to H5N1 infection in astrocytes. In this study, a functional genomics approach was utilized to investigate comprehensive host responses to H5N1 infection in a human astrocyte cell line, U251 cells.*
+ 	
+## Experimental design	
+U251 cells were infected by H5N1 at MOI 1 or control . At time points 6, 12, and 24h, total RNA were extracted for microarray experiment. Three replicates were performed at each time point of infection and control infection.
+ 	
+## Platform
+GPL6480:	Agilent-014850 Whole Human Genome Microarray 4x44K G4112F (Probe Name version)
+
+## Status
+Public on Jan 04, 2016
+ 	
+## Contributor(s)	
+Lin X, Wang R, Sun X, Zhang J, Jin M
+
+## Citation(s)	
+Lin X, Wang R, Zhang J, Sun X et al. Insights into Human Astrocyte Response to H5N1 Infection by Microarray Analysis. Viruses 2015 May 22;7(5):2618-40. PMID: 26008703
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+We read our targets.
+
+```{r readTargets}
+require (limma)
+targets <- read.csv("~/Documents/BDBI/2nd_year/3rd_trimester/Omics_Techinques/R-practicals-M2/Balcells_Paula-OmicsTechniques/Exercise-1/targets.txt", sep="")
+targets
+```
+
+We construct the design matrix, both manually and using limma. We need to take into account that the matrix constructed by limma (matrix design2) will be ordered accordingly to limma, and not as in the targets.txt file or in the manual matrix design.
+
+```{r designMatrix}
+design<-matrix(
+  c(1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1),
+  nrow=18,byrow=F)
+design2 <-model.matrix(~ 0+targets$Group)
+colnames(design)<- c("con6h","con12h","con24h","hm6h","hm12h","hm24h")
+rownames(design) <- targets$sampleName
+print(design); print(design2)
+```
+
+The comparisons in which we are interested are:
+
+* Control 6h - Hm 6h
+* Control 12h - Hm 12h
+* Control 24h - Hm 24h
+
+The contrast matrix will account for these comparisons.
+
+```{r contrastsMatrix}
+cont.matrix <- makeContrasts (
+  con6vshm6 = con6h-hm6h,
+  con12vshm12 = con12h-hm12h,
+  con24vshm24 = con24h-hm24h,
+  levels=design)
+print(cont.matrix)
+```
+
+```{r}
+require(GEOquery)
+gse <- getGEO("GSE66597")
+set <- gse[[1]]
+require("affyPLM")
+eset <- normalize.ExpressionSet.invariantset(set)
+```
+
+```{r fitModel}
+require(limma)
+fit<-lmFit(eset, design)
+fit.main<-contrasts.fit(fit, cont.matrix)
+fit.main<-eBayes(fit.main)
+```
+
+```{r extractResults}
+topTab_con6vshm6 <- topTable(fit.main, number=nrow(fit.main), coef="con6vshm6", adjust="fdr");
+head(topTab_con6vshm6)
+topTab_con12vshm12 <- topTable(fit.main, number=nrow(fit.main), coef="con12vshm12", adjust="fdr"); head(topTab_con12vshm12)
+topTab_con24vshm24  <- topTable (fit.main, number=nrow(fit.main) , coef="con24vshm24", adjust="fdr"); head(topTab_con24vshm24)
+```
+
+```{r showResults}
+volcanoplot(fit.main, coef="con6vshm6", highlight=10)
+volcanoplot(fit.main, coef="con12vshm12", highlight=10)
+volcanoplot(fit.main, coef="con24vshm24", highlight=10)
+```
+
+```{r}
+#Exemple del profe
+BiocManager::install("hgug4112a.db")
+require(hgug4112a.db)
+columns(hgug4112a.db)
+probesAvsB <- rownames(topTab_AvsB)[1:10]
+anotAvsB <- select(hgu133a.db, probesAvsB, columns=c("ENTREZID","SYMBOL","GENENAME"))
+```
+
+
