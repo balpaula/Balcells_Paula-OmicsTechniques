@@ -15,22 +15,23 @@ dataDir <- file.path(workingDir, "dades")
 ```
 
 ## Abstract
-Influenza virus can not only affect the respiratory system but also infect the central nervous system (CNS) by leading to CNS disorder and encephalopathy and encephalitis. Previous studies suggest that infected astrocytes can produce cytokines as well as induce apoptosis as a response. The microarray data from a study that aims to investigate comprehensive host responses to H5N1 infection in a human astrocyte cell line (U251 cells) has been analyzed.
+Influenza virus can not only affect the respiratory system but also infect the central nervous system (CNS) by leading to CNS disorder and encephalopathy and encephalitis. Previous studies suggest that infected astrocytes can produce cytokines as well as induce apoptosis as a response. The microarray data from a study that aims to investigate comprehensive host responses to H5N1 infection in a human astrocyte cell line (U251 cells) has been analyzed. 
 
 ## Objectives
 The objective of the main study is to characterize the comprehensive host responses to H5N1 infection in the human astrocyte cell line U251.
 
 The goal for this microarray data analysis is to determine the genes involved in the response of human astrocytes to H5N1 infection by quantifying the expression levels of the genes of infected and non infected cells at different times.
 
-The specific objectives of thus analysis are:
+The specific objectives to be achieved by this analysis are:
 
-* Assessment of the quality of the raw dat
+* Assessment of the quality of the raw data
 * Assessment of the data of the normalized data
 * Identification of differentially expressed genes
 
-In order to achieve the main objective, to define the respone of U251 human astrocyte cells against influenza infection.
 
 ## Material and methods
+### Software
+### Data
 The experiment performed is an expression profiling by array. The experimental design from which the data was obtained consisted on: *U251 cells were infected by H5N1 at MOI 1 or control . At time points 6, 12, and 24h, total RNA were extracted for microarray experiment. Three replicates were performed at each time point of infection and control infection.*
 
 The data to be analyzed and obtained from the experiment consists on RNA microarray data. 
@@ -52,10 +53,12 @@ The targets include 2 groups (infected, control), 3 time points for each group (
 targets <-read.csv(file=file.path(dataDir,"targets.txt"), header = TRUE, sep="") 
 ```
 
+### Methods
+#### Workflow
+The first step in this analysis has been a quality assessment of the raw data directly form the microarrays. This step has included plotting the data in order to determine the differences between groups and time points; the raw data has been plotted into a boxplot, a hierarquical clustering and a principal component analysis. This has been followed by the procedure of data normalization, in order to make the data of the arrays comparable and avoid systematic biases. The normalization process includes background correction, normalization and summarization. Once the array data has been normalized, a second quality control of normalized data has been performed, using the same approach as in the previous assessment. The genes whose variability can be due to random variation have been filtered from the set. 
 
-### Workflow
 
-### Procedures
+#### Procedures
 
 ## Results
 
