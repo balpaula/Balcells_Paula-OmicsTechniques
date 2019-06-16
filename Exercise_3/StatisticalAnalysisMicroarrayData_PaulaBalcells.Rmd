@@ -1,0 +1,534 @@
+---
+title: "Statistical Analysis of Microarray Data"
+author: "Paula Balcells"
+date: "June 15, 2019"
+output: html_document
+---
+
+# Study "Insights into responses of human astrocytes to H5N1 infection by transcriptional analysis"
+
+## Summary
+The study "Insights into responses of human astrocytes to H5N1 infection by transcriptional analysis" was done using Homo Sapiens organisms and experiment type	Expression profiling by array.
+
+The following description was provided:	
+*Increasing evidence demonstrates influenza virus can not only affect the respiratory system, but also infect CNS and lead to CNS disorder and encephalopathy and encephalitis. Astrocytes are the most abundant cells in the CNS, which are capable of producing cytokines and neurotrophic factors and are essential for brain homeostasis and neuronal function. Previous studies suggested that influenza virus can infect astrocytes and induce proinflammatory cytokines response as well as apoptosis. Nevertheless, very few mechanistic data are available regarding host responses to H5N1 infection in astrocytes. In this study, a functional genomics approach was utilized to investigate comprehensive host responses to H5N1 infection in a human astrocyte cell line, U251 cells.*
+ 	
+## Experimental design	
+U251 cells were infected by H5N1 at MOI 1 or control . At time points 6, 12, and 24h, total RNA were extracted for microarray experiment. Three replicates were performed at each time point of infection and control infection.
+ 	
+## Platform
+GPL6480:	Agilent-014850 Whole Human Genome Microarray 4x44K G4112F (Probe Name version)
+
+## Status
+Public on Jan 04, 2016
+ 	
+## Contributor(s)	
+Lin X, Wang R, Sun X, Zhang J, Jin M
+
+## Citation(s)	
+Lin X, Wang R, Zhang J, Sun X et al. Insights into Human Astrocyte Response to H5N1 Infection by Microarray Analysis. Viruses 2015 May 22;7(5):2618-40. PMID: 26008703
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Statistical analysis
+
+## Packages
+
+In order to perform a complete analysis, several packages will be used. Some of them are going to be download from the Bioconductor repository, and the others from the CRAN repository. We are going to install them all before the analysis.
+
+```{r include=FALSE}
+if (!require(BiocManager)) install.packages("BiocManager")
+
+installifnot <- function (pkg){
+  if (!require(pkg, character.only=T)){
+    BiocManager::install(pkg)
+}else{
+  require(pkg, character.only=T)
+  }
+}
+```
+
+```{r echo = T, results = 'hide', message=FALSE}
+installifnot("pd.mogene.1.0.st.v1")
+installifnot("mogene10sttranscriptcluster.db")
+installifnot("oligo")
+installifnot("limma")
+installifnot("Biobase")
+installifnot("arrayQualityMetrics")
+installifnot("genefilter")
+installifnot("multtest")
+installifnot("annotate")
+installifnot("xtable")
+installifnot("gplots")
+installifnot("scatterplot3d")
+installifnot("affyPLM")
+installifnot("hgug4112a.db")
+installifnot("ReactomePA")
+
+install.packages("survival")
+install.packages("foreign")
+install.packages("Hmisc")
+install.packages("gdtools")
+install.packages("gridSVG")
+install.packages("ggrepel")
+```
+
+## Data
+
+First of all, we are going to prepare the data for the analysis. This data will consist on two different parts, the raw microarray data set and the targets file, created from the information of the samples of the experiment.
+
+For the selected series (GSE66597), there are not CEL files available at GEO with the raw data of the experiment. Instead, the raw data is available in text files, and can be downloaded using the GEOquery package. For the analysis and use of R functions and packages, it has to be taken into account that the raw data was experimentally obtained with an Agilent gene expression microarray platform.
+
+```{r echo = T, results = 'hide', message=FALSE}
+workingDir <-getwd()
+dataDir <- file.path(workingDir, "dades")
+resultsDir <- file.path(workingDir, "results")
+```
+
+```{r echo = T, results = 'hide', message=FALSE}
+require(GEOquery)
+#getGEOSuppFiles(GEO = "GSE66597", makeDirectory = TRUE)
+rawDir <- file.path(workingDir, "GSE66597/GSE66597_RAW")
+```
+
+The targets file contains the information about the different groups and covariates taken into account. The target file will be useful to relate the information from the expression set with the different conditions of interest of the experiment.
+
+Our targets file consists of 18 samples grouped into 6 groups; 3 groups for the control samples corresponding to the time points 6 hours, 12 hours and 24 hours, and 3 groups for the infected samples also corresponding to the same time points. For each group, there are 3 replicates. Also, a column with color codes have been added to facilitate the further graphical representations of the data. We are going to define these variables for future plotting.
+
+In order to read the raw data and linked it with the targets information, we are going to specify the files for the raw data inside the targets file.
+
+```{r}
+targets <- readTargets("targets.txt",row.names="FileName",sep="")
+fileNames <- as.character(targets$FileName)
+sampleNames <- as.character(targets$sampleName)
+sampleGroup <- as.character(targets$Group)
+sampleReplicate <- as.character(targets$Replicate)
+sampleColor <- as.character(targets$Color)
+targets
+```
+
+The appropriate function to read Agilent raw data is read.maimages. In this case, the data is single-channel data (one color) and an EListRaw object will be created as a result.
+
+```{r echo = T, results = 'hide', message=FALSE}
+rawData <- read.maimages(targets,path=rawDir,source="agilent", green.only=TRUE)
+```
+
+## Quality control of raw data
+
+In this step of the analysis, we want to check if the raw data has enough quality for normalization. For the data to be of good quality, there must not be much variation (detected from outlier arrays), otherwise the normalization will not solve the noise and this could lead to bad results.
+
+In order to do this quality control, we are going to use different approaches:
+
+* Boxplot
+* Hierarchical clustering
+* Principal Component Analysis (PCA)
+
+Another useful approach would be using ArrayQualityMetrics package. However, the arrayQualityMetrics only accepts an object of class ExpressionSet, AffyBatch, NChannelSet, ExpressionSetIllumina, RGList or MAList as a Bioconductor microarray dataset container. The RGList would be the Agilent object for two-color data; in our case, the data is one-color (single channel) so we will not be able to use this approach with the object we have created.
+
+```{r echo = T, results = 'hide'}
+# require(arrayQualityMetrics)
+# arrayQualityMetrics(rawData, outdir = file.path(resultsDir, "QCDir.Raw"), force=TRUE)
+```
+
+Three different plots instead are done; boxplot, hierarchical clustering and Principal Component Analysis, which will allow to identify outliers, variability and the intensity of the data.
+
+Instead of working with the expression values on the raw scale, the plots will be done with the expression values on the log scale (log2 values).
+
+```{r}
+rawDataLog <- log2(rawData$E)
+```
+
+```{r}
+boxplot(rawDataLog, which="all",las=2, main="Intensity distribution of RAW data", 
+        cex.axis=0.6, col=sampleColor, names=sampleNames)
+```
+
+In the boxplot, we can observe that there is a light variation of intensity among arrays, which is the expected for raw data.
+
+```{r}
+clust.euclid.average <- hclust(dist(t(log2(rawDataLog))),method="average")
+plot(clust.euclid.average, labels=sampleNames, main="Hierarchical clustering of RawData", 
+     cex=0.7,  hang=-1)
+```
+
+The hclust function starts with one cluster per sample and clusters iteratively the two most similar ones, until there is a single cluster. The "average" argument specifies UPGMA as the agglomeration method to be used. The final plot shows which samples are more similar between them.
+
+```{r message=FALSE}
+require(ggplot2)
+require(ggrepel)
+
+plotPCA3 <- function(X, labels, factor, title, scale, colors, size=1.5, glineas=0.25){
+  data <- prcomp(t(X),scale=scale)
+  dataDf <- data.frame(data$x)
+  Group <- factor
+  loads <- round(data$sdev^2/sum(data$sdev^2)*100,1)
+  p1 <- ggplot(dataDf,aes(x=PC1, y=PC2)) +
+    theme_classic() +
+    geom_hline(yintercept = 0, color = "gray70") +
+    geom_vline(xintercept = 0, color = "gray70") +
+    geom_point(aes(color = Group), alpha = 0.55, size = 3) +
+    coord_cartesian(xlim = c(min(data$x[,1])-5,max(data$x[,1])+5)) +
+    scale_fill_discrete(name = "Group")
+  p1 + geom_text_repel(aes(y = PC2 + 0.25, label = labels), segment.size = 0.25, size = size) + 
+    labs(x = c(paste("PC1",loads[1],"%")), y = c(paste("PC2", loads[2], "%"))) +
+    ggtitle(paste("Principal Component Analysis for: ", title, sep=" ")) +
+    scale_color_manual(values=colors)
+}
+```
+
+```{r}
+plotPCA3(rawDataLog, labels = targets$sampleName, factor = targets$Group, title = "Raw data", scale = FALSE, size = 3, colors = targets$Color)
+```
+
+The 51.3% of the total variability of the samples is explained by the first component of the PCA. The main contribution of this variability is the fact that whether the samples are infected or not (controls), as the control samples are found on the left section of the graph, while the infected samples are mainly found on the right section.
+
+## Data normalization
+
+Once we have assessed the quality of the raw data, we will normalize it in order to make the arrays comparable among them and to reduce the noise caused by external factors than the ones considered in the experiment. With the data normalized, then, we will be able to proceed to the differential expression analysis. 
+
+As our raw data contains control and duplicated probes, we are going to filter first the data.
+
+```{r}
+control <- rawData$genes$ControlType==1
+filteredData <- rawData[!control,]
+dup <- duplicated(filteredData$genes$ProbeName)
+filteredData <- filteredData[!dup,]
+```
+
+The normalization process is done in three steps: background correction, normalization and summarization.
+
+```{r message=FALSE}
+bg.set <- limma::backgroundCorrect(filteredData, method = "normexp")
+nset <- normalizeBetweenArrays(bg.set, method = "quantile")
+```
+
+## Building the ExpressionSet
+
+From the normalized data, now we are able to build an ExpressionSet, which will be useful for proceeding with the analysis and having acces to more functions.
+
+```{r}
+expressions <- data.frame(nset$E, row.names = nset$genes$ProbeName)
+genes <- t(expressions)[0,]
+
+#AssayData
+require(Biobase)
+expressions <- as.matrix(expressions)
+eset <- ExpressionSet(expressions)
+
+#Information about covariates
+columnDesc <-  data.frame(labelDescription= c("File Name", "Sample Name", "Group", "Replicate", "Color"))
+annot <- new("AnnotatedDataFrame", data=targets, varMetadata= columnDesc)
+
+rownames(pData(annot))<-pData(annot)$sampleName
+eset <- ExpressionSet(assayData=expressions, phenoData=annot)
+
+#Information about features
+eset <- ExpressionSet(assayData=expressions, phenoData=annot, featureNames =genes)
+show(eset)
+```
+
+
+## Quality control of normalized data
+
+Now that the normalization is done and that we have build an expression set from it, we will perform another quality control to assess how does the normalized data look. 
+
+As now an expression set has been build, it is possible to use the function arrayQualityMetrics to perform a complete quality control. The results will be sotred in the "results" directory.
+
+```{r echo = T, results = 'hide', message=FALSE}
+require(arrayQualityMetrics)
+arrayQualityMetrics(eset, outdir = file.path(resultsDir, "QCDir.Normalized"), force=TRUE)
+```
+
+All the result obtained with the arrayQualityMetrics indicate that the data has been properly normalized and that there are no potential problems, so the it is possible to proceed with the analysis
+
+The same plots as before has also been done. Changes in all three can be noticed.
+
+```{r}
+boxplot(exprs(eset), which="all",las=2, main="Intensity distribution of normalized data", 
+        cex.axis=0.6, col=sampleColor, names=sampleNames)
+```
+
+For the boxplot, we can observe that all the boxplots look the same, which may indicate that the normalization has been applied properly on the data. These same boxplots are due to the quantile normalization method used in the limma function normalizeBetweenArrays.
+
+```{r}
+clust.euclid.average <- hclust(dist(t(exprs(eset))),method="average")
+plot(clust.euclid.average, labels=sampleNames, main="Hierarchical clustering of normalized data",
+     cex=0.7,  hang=-1)
+```
+
+The clustering of the normalized data is different than the one for the raw data.
+
+```{r}
+plotPCA3(exprs(eset), labels = targets$sampleName, factor = targets$Group, title = "Normalized data", scale = T, size = 3, colors = targets$Color)
+```
+
+The first component now accounts for the 29.8% of the total variability; the percentage is less than for the first component on raw data. Now, the samples are separated differently. The infected ones are in the bottom section, whereas the controls are found above. If we examine each of the samples closer, we find that the samples on the left correspond to hours 6h and 12h for the controls and hour 6h for the infected (except for one 12h replicate that is also on the left), and the samples on the right to hour 24h for the controls and hours 12h and 24h for the infected.
+
+## Detecting most variable genes
+
+The selection of the most variable genes will depend on the total number of genes considered for the analysis. In order to make a first general detection, an approach is to plot the variability of all genes and identify which present a highest standard deviation, assumed to be due to external causes and not random variation. We will use as treshold the 95% percentile.
+
+```{r}
+sds <- apply(eset, 1, sd)
+sdsO<- sort(sds)
+plot(1:length(sdsO), sdsO, main="Distribution of variability for all genes", 
+     sub="Vertical lines represent 90% and 95% percentiles", xlab="Gene index (from least to most variable)",
+     ylab="Standard deviation") +
+abline(v=length(sds)*c(0.9,0.95))
+```
+
+## Filtering least variable genes
+
+In this step, those genes whose variability could be due to random variation and not due to the conditions studied in the experiment are filtered. To do the filtering the package genefilter and function nsFilter are used, based on a variability treshold.
+
+```{r}
+require(genefilter)
+require(hgug4112a.db)
+
+annotation(eset) <- "hgug4112a.db"
+filtered <- nsFilter(eset, require.entrez = TRUE, remove.dupEntrez = TRUE, var.filter = TRUE, var.func = IQR, var.cutoff = 0.75, filterByQuantile = TRUE, feature.exclude = "^AFFX")
+
+print(filtered$filter.log)
+```
+
+By removing the least variable genes, the filtered set is obtained.
+
+```{r}
+eset_filtered <- filtered$eset
+```
+
+## The design matrix
+
+To select the differentially expressed genes, many approaches can be used. Here, the Linear Models for Microarrays method, implemented in the limma package, is going to be used. In the first step for this method, a design matrix is created; it relates each sample to a different group. In this case, we have two main groups (control, infected) and three sub-groups per each one, corresponding to the time points (6h, 12h, 24h).
+
+The design matrix is defined using the factor variable "Group" previously included in the targets file. The row samples belonging to the column group are indicated with a 1.
+
+```{r}
+treat <- targets$Group
+lev <- factor(treat, levels = unique(treat))
+design <-model.matrix(~0+lev)
+colnames(design) <- levels(lev)
+rownames(design) <- targets$sampleName
+print(design)
+```
+
+## The contrast matrix
+
+The comparisons between groups in which we are interested are:
+
+* Control 6h - Hm 6h
+* Control 12h - Hm 12h
+* Control 24h - Hm 24h
+
+That is, the control group compared with the infected group at different time points.
+
+The contrast matrix defines these comparisons.
+
+```{r}
+require(limma)
+cont.matrix <- makeContrasts (
+  con6vshm6 = con6h-hm6h,
+  con12vshm12 = con12h-hm12h,
+  con24vshm24 = con24h-hm24h,
+  levels=design)
+print(cont.matrix)
+```
+
+Our matrix accounts for the three comparisons; this way, we aim to evaluate the effect of the infection.
+
+## Model estimation
+
+Once we have defined the deign and contrast matrices, the next step is to estimate the model, which will be used to perform the tests and see if there is any significance differential expression. 
+
+The limma package extends uses Empirical Bayes models to estimate variability based on both pverall matrix and individuals. The result is stored in a MArrayLM object.
+
+```{r}
+fit<-lmFit(eset, design)
+fit.main<-contrasts.fit(fit, cont.matrix)
+fit.main<-eBayes(fit.main)
+```
+
+## Differentially Expressed Genes
+
+In this step, we order the genes from smallest to highest p-value for each of the comparisons. The genes with smallest p-value are considered the most differentially expressed, whether those with a higher p-value are considered less differentially expressed.
+
+```{r}
+topTab_con6vshm6 <- topTable(fit.main, number=nrow(fit.main), coef="con6vshm6", adjust="fdr");
+head(topTab_con6vshm6)
+
+topTab_con12vshm12 <- topTable(fit.main, number=nrow(fit.main), coef="con12vshm12", adjust="fdr");
+head(topTab_con12vshm12)
+
+topTab_con24vshm24  <- topTable(fit.main, number=nrow(fit.main), coef="con24vshm24", adjust="fdr");
+head(topTab_con24vshm24)
+```
+
+To extract results from these top tables, we are going to proceed to gene annotation, which will provide a more accurate insight for deciding which genes can be considered more differentially expressed.
+
+## Gene annotation
+
+Gene annotation will consist on associating the identifiers on the tables with more common gene names, using the annotation package used for the microarray experiment.
+
+```{r}
+require(hgug4112a.db)
+annotatedTopTable <- function(topTab, anotPackage){
+  topTab <- cbind(PROBEID=rownames(topTab), topTab)
+  myProbes <- rownames(topTab)
+  thePackage <- eval(parse(text = anotPackage))
+  geneAnots <- select(thePackage, myProbes, c("SYMBOL", "ENTREZID", "GENENAME"))
+  annotatedTopTab <- merge(x=geneAnots, y=topTab, by.x="PROBEID", by.y="PROBEID")
+  return(annotatedTopTab)
+}
+```
+
+In this case, the annotated top tables show four columns: PROBEID, SYMBOL; ENTREZID and GeneName.
+
+```{r}
+topAnnotated_con6vshm6 <- annotatedTopTable(topTab_con6vshm6, anotPackage = "hgug4112a.db")
+head(topAnnotated_con6vshm6[1:6,1:4])
+
+topAnnotated_con12vshm12 <- annotatedTopTable(topTab_con12vshm12, anotPackage = "hgug4112a.db")
+head(topAnnotated_con12vshm12[1:6,1:4])
+
+topAnnotated_con24vshm24 <- annotatedTopTable(topTab_con24vshm24, anotPackage = "hgug4112a.db")
+head(topAnnotated_con12vshm12[1:6,1:4])
+```
+
+## Visualizing differential expression
+
+To visualize the differential expression, volcano plots can be used. Here, a volcano plot for each comparison has been done. The X-axis can be considered as the "biological effect" and the Y-axis as the "statistical effect".
+
+```{r echo = T, results = 'hide', message=FALSE}
+geneSymbols <- select(hgug4112a.db, rownames(fit.main), c("SYMBOL"))
+SYMBOLS <- geneSymbols$SYMBOL
+```
+
+The symbols of the top ten genes in the top tables are shown also in the plots.
+
+```{r showresults}
+volcanoplot(fit.main, coef=1, highlight = 10, names=SYMBOLS, main=paste("Differentially expressed genes", colnames(cont.matrix)[1], sep="\n")) +
+abline(v=c(-1,1))
+
+volcanoplot(fit.main, coef=2, highlight = 10, names=SYMBOLS, main=paste("Differentially expressed genes", colnames(cont.matrix)[2], sep="\n")) +
+abline(v=c(-1,1))
+
+volcanoplot(fit.main, coef=3, highlight = 10, names=SYMBOLS, main=paste("Differentially expressed genes", colnames(cont.matrix)[3], sep="\n")) +
+abline(v=c(-1,1))
+```
+
+## Multiple comparisons
+
+A further step in the analysis of the genes selected for each comparison can be done using a graphical approach, to see which genes and how many are only selected for one comparison, both or all three comparisons.
+
+These can be also be achieved with the the limma package and the functions decideTEsts and VennDiagram.
+
+```{r}
+require(limma)
+res <- decideTests(fit.main, method="separate", adjust.method="fdr", p.value=0.1, lfc=1)
+sum.res.rows <- apply(abs(res),1,sum)
+res.selected <- res[sum.res.rows!=0,]
+print(summary(res))
+```
+
+We see that most genes are not significant and that only a few ones are down regulated, and even fewer are up regulated.
+
+```{r}
+vennDiagram(res.selected[,1:3], cex=0.9) +
+title("Genes in common between the three comparisons\n Genes selected with FDR < 0.1 and logFC > 1")
+```
+
+The three comparisons only share two genes; however, comparisons for 12h and 24h share 11 genes.
+
+## Biological significance of results
+
+The Bioconductor package ReactomePA can provide a first statistical approach for the biological interpretation of the results. It allows to perform a basic enrichment analysis for pathways from a list of genes.
+
+First of all, we are going to prepare the list of genes and the Entrez Identifiers for all the genes analyzed.
+
+```{r}
+listOfTables <- list(con6vshm6 = topTab_con6vshm6, 
+                     con12vshm12 = topTab_con12vshm12, 
+                     con24vshm24 = topTab_con24vshm24)
+listOfSelected <- list()
+i = 1
+for (i in 1:length(listOfTables)){
+  # select the toptable
+  topTab <- listOfTables[[i]]
+  # select the genes to be included in the analysis
+  whichGenes<-topTab["adj.P.Val"]<0.15
+  selectedIDs <- rownames(topTab)[whichGenes]
+  # convert the ID to Entrez
+  EntrezIDs <- select(hgug4112a.db, selectedIDs, c("ENTREZID"))
+  EntrezIDs <- EntrezIDs$ENTREZID
+  listOfSelected[[i]] <- EntrezIDs
+  names(listOfSelected)[i] <- names(listOfTables)[i]
+}
+sapply(listOfSelected, length)
+```
+
+```{r}
+EntrezUni <- topAnnotated_con24vshm24$ENTREZID
+```
+
+We will use the function enrichPathway for the gene lists of all three comparisons.
+
+```{r echo = T, results = 'hide', message=FALSE}
+require(ReactomePA)
+
+listOfData <- listOfSelected[1:3]
+comparisonsNames <- names(listOfData)
+
+organism_ <- "human"
+universe <- as.character(EntrezUni)
+
+for (i in 1:length(listOfData)){
+  data <- listOfData[[i]]
+  genesIn <- listOfSelected[[i]]
+  comparison <- comparisonsNames[i]
+  enrich.result <- enrichPathway(gene = genesIn,
+                                 pvalueCutoff = 0.05,
+                                 readable = T,
+                                 organism =  organism_,
+                                 universe = universe,
+                                 minGSSize = 10,
+                                 maxGSSize = 500,
+                                 pAdjustMethod = "BH")
+  
+  if (length(rownames(enrich.result@result)) != 0) {
+  write.csv(as.data.frame(enrich.result), 
+             file =paste0("./results/","ReactomePA.Results.",comparison,".csv"), 
+             row.names = FALSE)
+  
+  pdf(file=paste0("./results/","ReactomePABarplot.",comparison,".pdf"))
+    print(barplot(enrich.result, showCategory = 15, font.size = 4, 
+            title = paste0("Reactome Pathway Analysis for ", comparison,". Barplot")))
+  dev.off()
+  
+  pdf(file = paste0("./results/","ReactomePAcnetplot.",comparison,".pdf"))
+    print(cnetplot(enrich.result, categorySize = "geneNum", showCategory = 15, 
+         vertex.label.cex = 0.75))
+  dev.off()
+  }
+}
+
+```
+
+The complete results, including a csv table, a barplot and a reactomePA plot, have been saved in the "results" directory.
+
+By looking at the reactomePA plot, a clear inference for the interferon signaling and the interferon alpha/beta signaling pathways can be made.
+
+## Summary of the results
+
+Finally, as the last step of this analysis, the results obtained are summarized into a table containing the main pathways enriched.
+
+```{r}
+Tab.react <- read.csv2(file.path("./results/ReactomePA.Results.con24vshm24.csv"), sep = ",", header = TRUE, row.names = 1)
+
+Tab.react <- Tab.react[1:4, 1:5]
+head(Tab.react)
+```
+
+We can conclude that there are differentially expressed genes between the control and the infected astorcyte cells which suggest the over-activated interferon signaling in U251 cells infected by H5N1. This over-activation altogether with an excessive pro-inflammatory response to the infection could contribute to the immunologic injury of the astrocyte cells.
