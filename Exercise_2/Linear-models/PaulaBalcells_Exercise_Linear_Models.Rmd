@@ -102,7 +102,6 @@ volcanoplot(fit.main, coef="con24vshm24", highlight=10)
 ```
 
 ```{r}
-#Exemple del profe
 BiocManager::install("hgug4112a.db")
 require(hgug4112a.db)
 columns(hgug4112a.db)

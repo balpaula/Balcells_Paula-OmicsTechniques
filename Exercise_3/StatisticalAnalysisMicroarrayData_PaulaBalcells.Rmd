@@ -5,7 +5,14 @@ date: "June 15, 2019"
 output: html_document
 ---
 
-# Study "Insights into responses of human astrocytes to H5N1 infection by transcriptional analysis"
+# Information about the study
+## Title
+"Insights into responses of human astrocytes to H5N1 infection by transcriptional analysis"
+
+## Accession
+
+* GEO accession code: GSE66597
+* PubMed ID: 26008703
 
 ## Summary
 The study "Insights into responses of human astrocytes to H5N1 infection by transcriptional analysis" was done using Homo Sapiens organisms and experiment type	Expression profiling by array.
@@ -107,7 +114,12 @@ sampleNames <- as.character(targets$sampleName)
 sampleGroup <- as.character(targets$Group)
 sampleReplicate <- as.character(targets$Replicate)
 sampleColor <- as.character(targets$Color)
-targets
+```
+
+```{r echo=FALSE}
+knitr::kable(
+  targets, booktabs = TRUE, caption = "Targets file"
+)
 ```
 
 The appropriate function to read Agilent raw data is read.maimages. In this case, the data is single-channel data (one color) and an EListRaw object will be created as a result.
@@ -300,6 +312,12 @@ By removing the least variable genes, the filtered set is obtained.
 eset_filtered <- filtered$eset
 ```
 
+```{r include=FALSE}
+write.csv(exprs(eset), file="./results/normalized.Data.csv")
+write.csv(exprs(eset_filtered), file="./results/normalized.Filtered.Data.csv")
+save(eset, eset_filtered, file="./results/normalized.Data.Rda")
+```
+
 ## The design matrix
 
 To select the differentially expressed genes, many approaches can be used. Here, the Linear Models for Microarrays method, implemented in the limma package, is going to be used. In the first step for this method, a design matrix is created; it relates each sample to a different group. In this case, we have two main groups (control, infected) and three sub-groups per each one, corresponding to the time points (6h, 12h, 24h).
@@ -319,20 +337,22 @@ print(design)
 
 The comparisons between groups in which we are interested are:
 
-* Control 6h - Hm 6h
-* Control 12h - Hm 12h
-* Control 24h - Hm 24h
+* Hm 6h - Control 6h
+* Hm 12h - Control 12h
+* Hm 24h - Control 24h
+* Hm 6h - Hm 24h
 
-That is, the control group compared with the infected group at different time points.
+That is, the control group compared with the infected group at different time points. Also, the infected group at the final stage (24h) compared with the first stage (6h).
 
 The contrast matrix defines these comparisons.
 
 ```{r}
 require(limma)
 cont.matrix <- makeContrasts (
-  con6vshm6 = con6h-hm6h,
-  con12vshm12 = con12h-hm12h,
-  con24vshm24 = con24h-hm24h,
+  hm6vscon6 = hm6h-con6h,
+  hm12vscon12 = hm12h-con12h,
+  hm24vscon24 = hm24h-con24h,
+  hm24vshm6 = hm24h-hm6h,
   levels=design)
 print(cont.matrix)
 ```
@@ -343,7 +363,7 @@ Our matrix accounts for the three comparisons; this way, we aim to evaluate the 
 
 Once we have defined the deign and contrast matrices, the next step is to estimate the model, which will be used to perform the tests and see if there is any significance differential expression. 
 
-The limma package extends uses Empirical Bayes models to estimate variability based on both pverall matrix and individuals. The result is stored in a MArrayLM object.
+The limma package uses Empirical Bayes models to estimate variability based on both overall matrix and individuals. The result is stored in a MArrayLM object.
 
 ```{r}
 fit<-lmFit(eset, design)
@@ -356,21 +376,48 @@ fit.main<-eBayes(fit.main)
 In this step, we order the genes from smallest to highest p-value for each of the comparisons. The genes with smallest p-value are considered the most differentially expressed, whether those with a higher p-value are considered less differentially expressed.
 
 ```{r}
-topTab_con6vshm6 <- topTable(fit.main, number=nrow(fit.main), coef="con6vshm6", adjust="fdr");
-head(topTab_con6vshm6)
+topTab_hm6vscon6 <- topTable(fit.main, number=nrow(fit.main), coef="hm6vscon6", adjust="fdr")
+tt1 <- head(topTab_hm6vscon6)
 
-topTab_con12vshm12 <- topTable(fit.main, number=nrow(fit.main), coef="con12vshm12", adjust="fdr");
-head(topTab_con12vshm12)
+topTab_hm12vscon12 <- topTable(fit.main, number=nrow(fit.main), coef="hm12vscon12", adjust="fdr")
+tt2 <-head(topTab_hm12vscon12)
 
-topTab_con24vshm24  <- topTable(fit.main, number=nrow(fit.main), coef="con24vshm24", adjust="fdr");
-head(topTab_con24vshm24)
+topTab_hm24vscon24  <- topTable(fit.main, number=nrow(fit.main), coef="hm24vscon24", adjust="fdr")
+tt3 <- head(topTab_hm24vscon24)
+
+topTab_hm24vshm6  <- topTable(fit.main, number=nrow(fit.main), coef="hm24vshm6", adjust="fdr")
+tt4 <- head(topTab_hm24vshm6)
+```
+
+```{r echo=FALSE}
+knitr::kable(
+  tt1, booktabs = TRUE, caption = "Top table results for hm6vscon6 comparison"
+)
+```
+
+```{r echo=FALSE}
+knitr::kable(
+  tt2, booktabs = TRUE, caption = "Top table results for hm12vscon12 comparison"
+)
+```
+
+```{r echo=FALSE}
+knitr::kable(
+  tt3, booktabs = TRUE, caption = "Top table results for hm24vscon24 comparison"
+)
+```
+
+```{r echo=FALSE}
+knitr::kable(
+  tt4, booktabs = TRUE, caption = "Top table results for hm24vshm6 comparison"
+)
 ```
 
 To extract results from these top tables, we are going to proceed to gene annotation, which will provide a more accurate insight for deciding which genes can be considered more differentially expressed.
 
 ## Gene annotation
 
-Gene annotation will consist on associating the identifiers on the tables with more common gene names, using the annotation package used for the microarray experiment.
+Gene annotation will consist on associating the identifiers on the tables with more common gene names, using the Agilent annotation package used for the microarray experiment.
 
 ```{r}
 require(hgug4112a.db)
@@ -387,14 +434,41 @@ annotatedTopTable <- function(topTab, anotPackage){
 In this case, the annotated top tables show four columns: PROBEID, SYMBOL; ENTREZID and GeneName.
 
 ```{r}
-topAnnotated_con6vshm6 <- annotatedTopTable(topTab_con6vshm6, anotPackage = "hgug4112a.db")
-head(topAnnotated_con6vshm6[1:6,1:4])
+topAnnotated_hm6vscon6 <- annotatedTopTable(topTab_hm6vscon6, anotPackage = "hgug4112a.db")
+tta1 <- head(topAnnotated_hm6vscon6[1:6,1:4])
 
-topAnnotated_con12vshm12 <- annotatedTopTable(topTab_con12vshm12, anotPackage = "hgug4112a.db")
-head(topAnnotated_con12vshm12[1:6,1:4])
+topAnnotated_hm12vscon12 <- annotatedTopTable(topTab_hm12vscon12, anotPackage = "hgug4112a.db")
+tta2 <- head(topAnnotated_hm12vscon12[1:6,1:4])
 
-topAnnotated_con24vshm24 <- annotatedTopTable(topTab_con24vshm24, anotPackage = "hgug4112a.db")
-head(topAnnotated_con12vshm12[1:6,1:4])
+topAnnotated_hm24vscon24 <- annotatedTopTable(topTab_hm24vscon24, anotPackage = "hgug4112a.db")
+tta3 <- head(topAnnotated_hm24vscon24[1:6,1:4])
+
+topAnnotated_hm24vshm6 <- annotatedTopTable(topTab_hm24vshm6, anotPackage = "hgug4112a.db")
+tta4 <- head(topAnnotated_hm24vshm6[1:6,1:4])
+```
+
+```{r echo=FALSE}
+knitr::kable(
+  tta1, booktabs = TRUE, caption = "Annotated top table results for hm6vscon6 comparison"
+)
+```
+
+```{r echo=FALSE}
+knitr::kable(
+  tta2, booktabs = TRUE, caption = "Annotated top table results for hm12vscon12 comparison"
+)
+```
+
+```{r echo=FALSE}
+knitr::kable(
+  tta3, booktabs = TRUE, caption = "Annotated top table results for hm24vscon24 comparison"
+)
+```
+
+```{r echo=FALSE}
+knitr::kable(
+  tta4, booktabs = TRUE, caption = "Annotated top table results for hm24vshm6 comparison"
+)
 ```
 
 ## Visualizing differential expression
@@ -417,6 +491,9 @@ abline(v=c(-1,1))
 
 volcanoplot(fit.main, coef=3, highlight = 10, names=SYMBOLS, main=paste("Differentially expressed genes", colnames(cont.matrix)[3], sep="\n")) +
 abline(v=c(-1,1))
+
+volcanoplot(fit.main, coef=4, highlight = 10, names=SYMBOLS, main=paste("Differentially expressed genes", colnames(cont.matrix)[4], sep="\n")) +
+abline(v=c(-1,1))
 ```
 
 ## Multiple comparisons
@@ -433,7 +510,7 @@ res.selected <- res[sum.res.rows!=0,]
 print(summary(res))
 ```
 
-We see that most genes are not significant and that only a few ones are down regulated, and even fewer are up regulated.
+We see that most genes are not significant, but a few ones are up regulated, and fewer are down regulated. The most relevant comparison in which we observe higher up and downregulation is in the comparison between the stages of the infected cells.
 
 ```{r}
 vennDiagram(res.selected[,1:3], cex=0.9) +
@@ -449,9 +526,10 @@ The Bioconductor package ReactomePA can provide a first statistical approach for
 First of all, we are going to prepare the list of genes and the Entrez Identifiers for all the genes analyzed.
 
 ```{r}
-listOfTables <- list(con6vshm6 = topTab_con6vshm6, 
-                     con12vshm12 = topTab_con12vshm12, 
-                     con24vshm24 = topTab_con24vshm24)
+listOfTables <- list(hm6vscon6 = topTab_hm6vscon6, 
+                     hm12vscon12 = topTab_hm12vscon12, 
+                     hm24vscon24 = topTab_hm24vscon24,
+                     hm24vshm6 = topTab_hm24vshm6)
 listOfSelected <- list()
 i = 1
 for (i in 1:length(listOfTables)){
@@ -470,7 +548,7 @@ sapply(listOfSelected, length)
 ```
 
 ```{r}
-EntrezUni <- topAnnotated_con24vshm24$ENTREZID
+EntrezUni <- topAnnotated_hm24vscon24$ENTREZID
 ```
 
 We will use the function enrichPathway for the gene lists of all three comparisons.
@@ -478,7 +556,7 @@ We will use the function enrichPathway for the gene lists of all three compariso
 ```{r echo = T, results = 'hide', message=FALSE}
 require(ReactomePA)
 
-listOfData <- listOfSelected[1:3]
+listOfData <- listOfSelected[1:4]
 comparisonsNames <- names(listOfData)
 
 organism_ <- "human"
@@ -516,6 +594,7 @@ for (i in 1:length(listOfData)){
 
 ```
 
+
 The complete results, including a csv table, a barplot and a reactomePA plot, have been saved in the "results" directory.
 
 By looking at the reactomePA plot, a clear inference for the interferon signaling and the interferon alpha/beta signaling pathways can be made.
@@ -525,10 +604,36 @@ By looking at the reactomePA plot, a clear inference for the interferon signalin
 Finally, as the last step of this analysis, the results obtained are summarized into a table containing the main pathways enriched.
 
 ```{r}
-Tab.react <- read.csv2(file.path("./results/ReactomePA.Results.con24vshm24.csv"), sep = ",", header = TRUE, row.names = 1)
+Tab.react.6 <- read.csv2(file.path("./results/ReactomePA.Results.hm6vscon6.csv"), sep = ",", header = TRUE, row.names = 1)
+Tab.react.6.short <- Tab.react.6[1:4, 1:5]
 
-Tab.react <- Tab.react[1:4, 1:5]
-head(Tab.react)
+Tab.react.12 <- read.csv2(file.path("./results/ReactomePA.Results.hm12vscon12.csv"), sep = ",", header = TRUE, row.names = 1)
+Tab.react.12.short <- Tab.react.12[1:4, 1:5]
+
+Tab.react <- read.csv2(file.path("./results/ReactomePA.Results.hm24vscon24.csv"), sep = ",", header = TRUE, row.names = 1)
+Tab.react.short <- Tab.react[1:4, 1:5]
+
+Tab.react.hm <- read.csv2(file.path("./results/ReactomePA.Results.hm24vshm6.csv"), sep = ",", header = TRUE, row.names = 1)
+Tab.react.hm.short <- Tab.react.hm[1:4, 1:5]
 ```
 
-We can conclude that there are differentially expressed genes between the control and the infected astorcyte cells which suggest the over-activated interferon signaling in U251 cells infected by H5N1. This over-activation altogether with an excessive pro-inflammatory response to the infection could contribute to the immunologic injury of the astrocyte cells.
+```{r echo=FALSE}
+knitr::kable(Tab.react.6.short, booktabs=TRUE,caption="First rows and columns for Reactome results on hm6vscon6 comparison")
+```
+
+```{r echo=FALSE}
+knitr::kable(Tab.react.12.short, booktabs=TRUE,caption="First rows and columns for Reactome results on hm12vscon12 comparison")
+```
+
+```{r echo=FALSE}
+knitr::kable(Tab.react.short, booktabs=TRUE,caption="First rows and columns for Reactome results on hm24vscon24 comparison")
+```
+
+```{r echo=FALSE}
+knitr::kable(Tab.react.hm.short, booktabs=TRUE,caption="First rows and columns for Reactome results on hm24vshm6 comparison")
+```
+
+We can conclude that there are differentially expressed genes between the control and the infected astorcyte cells, and also between the initial and final stage of the infected astrocytes, which suggest the over-activated interferon signaling in U251 cells infected by H5N1. 
+
+# GitHub repository
+https://github.com/balpaula/Balcells_Paula-OmicsTechniques
